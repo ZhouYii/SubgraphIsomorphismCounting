@@ -403,6 +403,24 @@ LABEL VertexFs::GetLabel(const UINT vertex) {
     return 99;
 }
 
+UINT* EdgeFs::OutgoingLabelIterator(const UINT vertex_id) {
+    if (vertex_id == 0) {
+        return adjacent_vertex_labels;
+    }
+
+    // End of (vertex_id-1) is start of vertex_id
+    return adjacent_vertex_labels + data[vertex_id];
+}
+
+UINT* EdgeFs::IncomingLabelIterator(const UINT vertex_id) {
+    if (vertex_id == 0) {
+        return rev_adjacent_vertex_labels;
+    }
+
+    // End of (vertex_id-1) is start of vertex_id
+    return rev_adjacent_vertex_labels + reverse_data[vertex_id];
+}
+
 /*
 int main () {
     VertexFs vfs("test.txt");

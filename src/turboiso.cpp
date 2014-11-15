@@ -310,13 +310,12 @@ void TurboIso(DataGraph& dg, query_node_map* qg) {
     */
 }
 
-/*
 int main() {
     DataGraph dg;
     query_node_map* qg;
 
-    VertexFs vfs("../data/vertex.fs.min");
-    EdgeFs efs("../data/adj.fs.min");
+    VertexFs vfs("test.txt");
+    EdgeFs efs("test_efs.txt", &vfs);
     dg.vfs = &vfs;
     dg.efs = &efs;
 
@@ -324,5 +323,4 @@ int main() {
 
     TurboIso(dg, qg);
 }
-*/
 #endif

@@ -67,12 +67,20 @@ class EdgeFs
         UINT* OutgoingEdgeIterator(const UINT vertex_id);
         UINT* IncomingEdgeIterator(const UINT vertex_id);
 
+        UINT* OutgoingLabelIterator(const UINT vertex_id);
+        UINT* IncomingLabelIterator(const UINT vertex_id);
+
         UINT GetInDegree(const UINT vertex_id);
         UINT GetOutDegree(const UINT vertex_id);
 
         // Human readable,editable
         void PrintGraphEdges(const char* file_path);
         void WriteToFile(const char* file_path);
+};
+
+struct DataGraph {
+    VertexFs* vfs;
+    EdgeFs* efs;
 };
 
 /*
