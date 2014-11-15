@@ -40,12 +40,17 @@ class EdgeFs
         UINT size;
         UINT reverse_size;
         UINT num_vertices;
-        // Offsets for r_boundaries of adjacent_vertex_labels reflect the fact
-        // that each (label,offset) pair is 2 UINTS
+        // Offsets for r_boundaries of end_offsets reflect the fact
+        // that each (label,offset) pair in adj_vertex_labels is 2 UINTS
         UINT* data;
         UINT* reverse_data;
+
+        // Start of Block 2: (Label,Offset) Pair block
         UINT* adjacent_vertex_labels;
+        // Start of Block 1 : VertexId block
         UINT* adjacent_vertex_ids;
+        UINT* rev_adjacent_vertex_labels;
+        UINT* rev_adjacent_vertex_ids;
 
         VertexFs* vfs;
 
@@ -59,7 +64,10 @@ class EdgeFs
         // Mutators
         void FlipEdges();
 
-        UINT* GetEdgeIterator(const UINT vertex_id);
+        UINT* OutgoingEdgeIterator(const UINT vertex_id);
+        UINT* IncomingEdgeIterator(const UINT vertex_id);
+
+        UINT GetInDegree(const UINT vertex_id);
         UINT GetOutDegree(const UINT vertex_id);
 
         // Human readable,editable
