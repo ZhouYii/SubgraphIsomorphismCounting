@@ -1,6 +1,5 @@
 #ifndef TURBOISO_H
 #define TURBOISO_H
-
 struct RankingPair {
     QueryNode* v;
     double score;
@@ -15,6 +14,14 @@ struct CompareRankingPair {
     }
 };
 
+/*
+ * Sorting for NEC eval order
+ */
+struct CompareNEC {
+    bool operator()(const pair<NECNode*, UINT>* p1, pair<NECNode*, UINT>* p2) {
+        return p1->second < p2->second;
+    }
+};
 
 /*
  * Used when BFS-ing through query graph.

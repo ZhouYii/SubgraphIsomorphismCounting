@@ -19,7 +19,7 @@ struct QueryNode {
 
 struct NECNode {
     // Members implicitly represent NEC
-    vector<QueryNode*>* members;;
+    vector<QueryNode*>* members;
 
     // Storage for directional edges
     vector<NECNode*>* parents;
@@ -64,6 +64,9 @@ query_node_map* ReadQueryGraphFromFile(const char* file_path) {
         vertex->children = new vector<QueryNode*>;
         map->insert(query_node_map::value_type(stoul(str_buf[0]), vertex));
         str_buf.clear();
+
+        cout << "QueryNode Mapping :"<< stoul(str_buf[0]) << "-";
+        cout << vertex << endl;
     }
     // Parse adjacency list
     while(getline(file,line)) {

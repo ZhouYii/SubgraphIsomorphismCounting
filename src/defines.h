@@ -14,10 +14,15 @@
 #define LABEL unsigned int
 #define ULONG unsigned long
 
+#define CHILD 0
+#define PARENT 1
+
 #include <unordered_map>
 #include <vector>
+#include <queue>
 #include <algorithm>
 #include "graph.cpp"
+#include "turboiso.h"
 
 /*
  * TYPEDEF
@@ -29,4 +34,8 @@ typedef std::unordered_map<UINT, vector<QueryNode*>*> NECBucketMap;
 
 typedef vector<vector<QueryNode*>*> VectorOfNeighborNodeVectors;
 
+// NECNode->Label->Vector<Candidates>
+typedef unordered_map<NECNode*, unordered_map<VERTEX, vector<VERTEX>*>* > CandidateRegions;
+
+typedef priority_queue<pair<NECNode*, UINT>*, vector<pair<NECNode*, UINT>*>, CompareNEC> NEC_PQ;
 #endif

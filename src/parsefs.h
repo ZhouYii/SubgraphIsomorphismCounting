@@ -64,14 +64,23 @@ class EdgeFs
         // Mutators
         void FlipEdges();
 
+        // Return iterator to vertex_id block
         UINT* OutgoingEdgeIterator(const UINT vertex_id);
         UINT* IncomingEdgeIterator(const UINT vertex_id);
+        // Need to handle NULL
+        UINT* OutgoingEdgeIterator(const UINT vertex_id, const LABEL label);
+        UINT* IncomingEdgeIterator(const UINT vertex_id, const LABEL label);
 
         UINT* OutgoingLabelIterator(const UINT vertex_id);
         UINT* IncomingLabelIterator(const UINT vertex_id);
 
+        vector<VERTEX>* GetOutdegreeVertices(VERTEX src, LABEL l);
+        vector<VERTEX>* GetIndegreeVertices(VERTEX src, LABEL l);
         UINT GetInDegree(const UINT vertex_id);
         UINT GetOutDegree(const UINT vertex_id);
+        UINT GetInDegree(const UINT vertex_id, const LABEL l);
+        UINT GetOutDegree(const UINT vertex_id, const LABEL l);
+
 
         // Human readable,editable
         void PrintGraphEdges(const char* file_path);

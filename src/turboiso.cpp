@@ -12,6 +12,11 @@
 #include "turboiso.h"
 
 using namespace std;
+bool ExploreCandidateRegions(DataGraph& dg, NECNode* nec_root,
+                             vector<VERTEX>* data_node_candidates,
+                             unordered_set<VERTEX>* marked_vertex, 
+                             CandidateRegions* cr,
+                             VERTEX parent);
 
 QueryNode* GetStartingQueryVertex(DataGraph& dg, query_node_map* qg) {
     QueryNode* tmp;
@@ -222,9 +227,13 @@ NECNode* RewriteToNECTree(query_node_map* qg, QueryNode* start,
             for (int i = 0; i < curr->children->size(); i += 1) {
                 cout << curr->children->at(i) << " | ";
             }
-            cout << " Parents:";
+            cout << " \t\tParents:";
             for (int i = 0; i < curr->parents->size(); i += 1) {
                 cout << curr->parents->at(i) << " | ";
+            }
+            cout << " \t\t Members:";
+            for (int i = 0; i < curr->members->size(); i += 1) {
+                cout << curr->members->at(i) << " | ";
             }
             cout << endl;
         }
@@ -246,37 +255,182 @@ bool NeighborLabelFilter(DataGraph& dg, UINT data_node_id, NECNode* nec_root) {
 }
 */
 
-/*
+NEC_PQ* GetNECEvalOrder(DataGraph& dg, NECNode* nec_root, 
+                        VERTEX v_index, int parent_flag) {
+    vector<NECNode*>* nec_nodes;
+    vector<NECNode*>::iterator it;
+    pair<NECNode*, UINT>* p;
+    NECNode* curr;
+    NEC_PQ* pq = new NEC_PQ;
+
+    if (parent_flag)
+        nec_nodes = nec_root->parents;
+    else 
+        nec_nodes = nec_root->children;
+    for (it = nec_nodes->begin(); it != nec_nodes->end(); it++) {
+        curr = *(it);
+        p = new pair<NECNode*, UINT>;
+        p->first = curr;
+        if (parent_flag)
+            p->second = dg.efs->GetInDegree(v_index, curr->members->at(0)->label);
+        else
+            p->second = dg.efs->GetOutDegree(v_index, curr->members->at(0)->label);
+        pq->push(p);
+    }
+
+    return pq;
+}
+
+void ClearCandidateRegions(CandidateRegions* cr, 
+                           vector<NECNode*>* visited_nec_neighbors,
+                           VERTEX parent)
+{
+    NECNode* clear_nec;
+
+    for (int neighbor = 0; neighbor < visited_nec_neighbors->size(); neighbor += 1) 
+    {
+        clear_nec = visited_nec_neighbors->at(neighbor);
+        if (cr->count(clear_nec) > 0 &&
+            cr->find(clear_nec)->second->count(parent) > 0) {
+            cr->find(clear_nec)->second->find(parent)->second->clear();
+        }
+    }
+}
+
+void InsertIntoCandidateRegion(CandidateRegions* cr, 
+                               VERTEX parent,
+                               NECNode* nec_node,
+                               VERTEX vertex_id) {
+    unordered_map<VERTEX, vector<VERTEX>*>* prior_vertex_map;
+
+    if (cr->count(nec_node) == 0) {
+        cr->insert(make_pair<NECNode*, unordered_map<VERTEX, vector<VERTEX>*>*>
+                        (nec_node, new unordered_map<VERTEX, vector<VERTEX>*>));
+        cout << "CR ADD " << nec_node << endl;
+    }
+
+    prior_vertex_map = cr->find(nec_node)->second;
+    if (prior_vertex_map->count(parent) == 0) {
+        prior_vertex_map->insert(make_pair<VERTEX, vector<VERTEX>*>
+                                          (parent, new vector<VERTEX>));
+        cout << "CR PARENT ADD " << parent << endl;
+    }
+    prior_vertex_map->find(parent)->second->push_back(vertex_id);
+}
+
+bool ExploreSubRegions(DataGraph& dg,
+                       unordered_set<VERTEX>* marked_vertex, 
+                       CandidateRegions* cr,
+                       VERTEX parent,
+                       VERTEX adj_vertex,
+                       vector<NECNode*>* visited_nec_neighbors,
+                       NEC_PQ* pq)
+{
+    NECNode* adj_nec;
+    vector<UINT>* candidate_vertices;
+    LABEL candidate_label;
+    bool matched = true;
+
+    if (pq->size() > 0) {
+        adj_nec = pq->top()->first;
+        candidate_label = adj_nec->members->at(0)->label;
+        candidate_vertices = dg.efs->GetOutdegreeVertices(adj_vertex, 
+                                                        candidate_label);
+        // Construct candidate vertex using VFS
+        if (ExploreCandidateRegions(dg, adj_nec, candidate_vertices,
+                                    marked_vertex,
+                                    cr, adj_vertex) == false)
+        {
+            ClearCandidateRegions(cr, visited_nec_neighbors, parent);
+            matched = false;
+        }
+        visited_nec_neighbors->push_back(adj_nec);
+        delete pq->top();
+        pq->pop();
+        delete candidate_vertices;
+    }
+    return matched;
+}
+
 bool ExploreCandidateRegions(DataGraph& dg, NECNode* nec_root,
                              vector<VERTEX>* data_node_candidates,
-                             unordered_set<VERTEX>* marked_vertex, CR_ROOT)
+                             unordered_set<VERTEX>* marked_vertex, 
+                             CandidateRegions* cr,
+                             VERTEX parent)
 {
     vector<VERTEX>::iterator it;
+
+    NEC_PQ* child_pq;
+    NEC_PQ* parent_pq;
+
+    vector<NECNode*> visited_nec_neighbors;
     VERTEX data_node_id;
     bool matched;
 
+    cout << "CR - Data node candidates " ;
+    for (int i = 0; i < data_node_candidates->size(); i += 1) {
+        cout << data_node_candidates->at(i) << " ";
+    }
+    cout << endl;
     it = data_node_candidates->begin();
     for(; it != data_node_candidates->end(); ++it) {
         data_node_id = *(it);
         if (marked_vertex->count(data_node_id) > 0 ||
-            DegreeFilter(dg, data_node_id, nec_root) == true ||
-            NeighborLabelFilter(dg, data_node_id, nec_root))
+            DegreeFilter(dg, data_node_id, nec_root) == true)
+            //NeighborLabelFilter(dg, data_node_id, nec_root))
             continue;
+
+        cout << "PARENT: " << parent << " CHILD:" << data_node_id << endl;
 
         marked_vertex->insert(data_node_id);
         matched = true;
 
         // Need to sort children
+        child_pq = GetNECEvalOrder(dg, nec_root, data_node_id, CHILD);
+        parent_pq = GetNECEvalOrder(dg, nec_root, data_node_id, PARENT);
+        cout << "eval order" << endl;
 
+        // Recursively generate CR for child NEC, by interleaving parent and
+        // child NEC nodes.
+        while (child_pq->size() > 0 || parent_pq->size() > 0) {
+            if(ExploreSubRegions(dg, marked_vertex, cr, parent, data_node_id, 
+                                 &visited_nec_neighbors, child_pq) == false) {
+                matched = false;
+                break;
+            }
+            if (ExploreSubRegions(dg, marked_vertex, cr, parent, data_node_id, 
+                                  &visited_nec_neighbors, parent_pq) == false) {
+                matched = false;
+                break;
+            }
+        }
+        cout << "leave while" << endl;
+
+        marked_vertex->erase(data_node_id);
+        if (matched == false) {
+            cout << "Matched False :" << parent << " , " << nec_root << endl;
+            continue;
+        }
+
+        // Insert into candidate region 
+        InsertIntoCandidateRegion(cr, parent, nec_root, data_node_id);
     }
 
-    if (CR_ROOT.size() < nec_root->members->size()) {
-        ClearAllCR();
+    cout << "Query:" << nec_root << "_Parent:" << parent << " ";
+    cout << cr->count(nec_root) << endl;
+
+    if (cr->count(nec_root) == 0) {
+        return false;
+    }
+
+    if (cr->find(nec_root)->second->find(parent)->second->size() 
+                < nec_root->members->size())
+    {
+        cr->find(nec_root)->second->find(parent)->second->clear();
         return false;
     }
     return true;
 }
-*/
 
 void TurboIso(DataGraph& dg, query_node_map* qg) {
     QueryNode* start_vertex;
@@ -287,11 +441,12 @@ void TurboIso(DataGraph& dg, query_node_map* qg) {
     unordered_set<NECNode*>* leaf_nec_nodes = new unordered_set<NECNode*>;
     vector<VERTEX> candidate_data_vertices;
     NECNode* nec_root;
+    CandidateRegions* cr = new CandidateRegions;
 
+    visited_vertices->clear();
     start_vertex = GetStartingQueryVertex(dg, qg);
     root_label = start_vertex->label;
     nec_root = RewriteToNECTree(qg, start_vertex, leaf_nec_nodes);
-    /*
 
     data_node_iter = dg.vfs->GetVertexIterator(root_label);
     for(int data_node_index = 0; 
@@ -301,13 +456,30 @@ void TurboIso(DataGraph& dg, query_node_map* qg) {
         root_node_id = *(data_node_iter + data_node_index);
         candidate_data_vertices.clear();
         candidate_data_vertices.push_back(root_node_id);
-        if(ExploreCandidateRegions(dg, nec_root, &candidate_data_vertices,
-                                   visited_vertices, CR_ROOT) == false) 
+
+        if(ExploreCandidateRegions(dg, nec_root, &candidate_data_vertices, 
+                                   visited_vertices, cr, -1) == false)
         {
+            cout << "false" << endl;
             continue;
         }
+        CandidateRegions::iterator it = cr->begin();
+        while (it != cr->end()) {
+            cout << "NEC NODE :" << it->first << " - \n";
+            unordered_map<VERTEX, vector<VERTEX>*>::iterator it2 = it->second->begin();
+            while (it2 != it->second->end()) {
+                cout << "\t\tDataNode vertex id: " << it2->first << " - ";
+                vector<VERTEX>* v = it2->second;
+                for (int i = 0; i < v->size(); i += 1) {
+                    cout << v->at(i) << " ";
+                }
+                cout << endl;
+                it2++;
+            }
+            it ++;
+        }
+        // Iterate and print me
     }
-    */
 }
 
 int main() {
