@@ -1,16 +1,30 @@
 #ifndef TURBOISO_H
 #define TURBOISO_H
+
+struct MatchingOrderPair {
+    queue<NECNode*>* q;
+    ULONG score;
+};
 struct RankingPair {
     QueryNode* v;
     double score;
 };
 
 /*
- *  Sorts for min-pq
+ *  Sorts for min-pq. TODO : verify min pq not max pq
  */
 struct CompareRankingPair {
     bool operator()(const RankingPair* p1, const RankingPair* p2) {
         return p1->score > p2->score;
+    }
+};
+
+/*
+ * Min PQ for matching order.
+ * */
+struct CompareMatchingOrder {
+    bool operator()(const MatchingOrderPair* m1, const MatchingOrderPair* m2) {
+        return m1->score > m2->score;
     }
 };
 
@@ -46,4 +60,8 @@ struct CRTree {
     CRNode* root;
     unordered_map<NECNode*, unordered_set<CRNode*> > candidate_regions;
 };
+
+typedef priority_queue<MatchingOrderPair*,
+                       vector<MatchingOrderPair*>,
+                       CompareMatchingOrder> MatchingOrderPq;
 #endif

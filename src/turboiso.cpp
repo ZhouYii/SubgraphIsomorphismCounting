@@ -303,6 +303,8 @@ void InsertIntoCandidateRegion(CandidateRegions* cr,
                                VERTEX vertex_id) {
     unordered_map<VERTEX, vector<VERTEX>*>* prior_vertex_map;
 
+    cout << "Insert into candidate regions: parent - " << parent << " vertex - " << nec_node << endl;
+
     if (cr->count(nec_node) == 0) {
         cr->insert(make_pair<NECNode*, unordered_map<VERTEX, vector<VERTEX>*>*>
                         (nec_node, new unordered_map<VERTEX, vector<VERTEX>*>));
@@ -380,15 +382,12 @@ bool ExploreCandidateRegions(DataGraph& dg, NECNode* nec_root,
             //NeighborLabelFilter(dg, data_node_id, nec_root))
             continue;
 
-        cout << "PARENT: " << parent << " CHILD:" << data_node_id << endl;
-
         marked_vertex->insert(data_node_id);
         matched = true;
 
         // Need to sort children
         child_pq = GetNECEvalOrder(dg, nec_root, data_node_id, CHILD);
         parent_pq = GetNECEvalOrder(dg, nec_root, data_node_id, PARENT);
-        cout << "eval order" << endl;
 
         // Recursively generate CR for child NEC, by interleaving parent and
         // child NEC nodes.
@@ -404,7 +403,6 @@ bool ExploreCandidateRegions(DataGraph& dg, NECNode* nec_root,
                 break;
             }
         }
-        cout << "leave while" << endl;
 
         marked_vertex->erase(data_node_id);
         if (matched == false) {
@@ -432,21 +430,180 @@ bool ExploreCandidateRegions(DataGraph& dg, NECNode* nec_root,
     return true;
 }
 
-void TurboIso(DataGraph& dg, query_node_map* qg) {
-    QueryNode* start_vertex;
-    VERTEX* data_node_iter;
-    LABEL root_label;
-    VERTEX root_node_id;
-    unordered_set<VERTEX>* visited_vertices = new unordered_set<VERTEX>;
-    unordered_set<NECNode*>* leaf_nec_nodes = new unordered_set<NECNode*>;
-    vector<VERTEX> candidate_data_vertices;
-    NECNode* nec_root;
-    CandidateRegions* cr = new CandidateRegions;
+vector<NECNode*>* MatchingOrderGetUnvisited(NECNode* leaf, 
+                                        unordered_set<NECNode*>* visited) {
+    vector<NECNode*>* v = new vector<NECNode*>;
+    NECNode* curr;
+    for (int i = 0; i < leaf->children->size(); i += 1) {
+        curr = leaf->children->at(i);
+        if (visited->count(curr) == 0)
+            v->push_back(curr);
+    }
+    for (int i = 0; i < leaf->parents->size(); i += 1) {
+        curr = leaf->parents->at(i);
+        if (visited->count(curr) == 0)
+            v->push_back(curr);
+    }
+    return v;
+}
 
-    visited_vertices->clear();
-    start_vertex = GetStartingQueryVertex(dg, qg);
-    root_label = start_vertex->label;
-    nec_root = RewriteToNECTree(qg, start_vertex, leaf_nec_nodes);
+void MatchingOrderVisitChild(NECNode* child, queue<NECNode*>* path, ULONG nontree_edges,
+                             queue<pair<queue<NECNode*>*, ULONG>*>* bfs_queue,
+                             unordered_set<NECNode*>* visited) {
+    queue<NECNode*>* new_path;
+    pair<queue<NECNode*>*, ULONG>* new_pair;
+
+    if (visited->count(child) > 0) {
+        // Already marked
+        return;
+    }
+
+    visited->insert(child);
+    new_path = new queue<NECNode*>(*path);
+
+    queue<NECNode*>* cp = new queue<NECNode*>(*new_path);
+    cout << "*** copied queue size: " << cp->size() << endl;
+    for (int i = cp->size(); i > 0; i -= 1) {
+        cout << cp->front() << endl;
+        cp->pop();
+    }
+    cout << "printed copied queue" << endl;
+    new_path->push(child);
+
+    new_pair = new pair<queue<NECNode*>*, ULONG>;
+    new_pair->first = new_path;
+    new_pair->second = nontree_edges;
+    bfs_queue->push(new_pair);
+}
+
+ULONG multiplyRange(ULONG start, ULONG end) {
+    if (start == end)
+        return start;
+    return multiplyRange(start, end/2) * multiplyRange(end/2 + 1, end);
+}
+
+ULONG xChoseY(ULONG x, ULONG y) {
+    return multiplyRange(y+1, x);
+}
+
+// TODO : New scoring that sums all NEC nodes not only leaf? Leaf 
+// may have few candidate but intermediate NEC may have many.
+ULONG MatchingOrderCalcScore(queue<NECNode*>* path, ULONG nontree_edges, CandidateRegions* cr) {
+    unordered_map<VERTEX, vector<VERTEX>*>* cr_nodes;
+    unordered_map<VERTEX, vector<VERTEX>*>::iterator it;
+    NECNode* leaf = path->back();
+    ULONG NEC_member_count = path->back()->members->size();
+    ULONG score = 0;
+
+    cout << "Leaf: " << leaf << endl;
+    cr_nodes = cr->at(leaf);
+    it = cr_nodes->begin();
+    if ( NEC_member_count > 1) {
+
+        while (it != cr_nodes->end()) {
+            score += xChoseY(it->second->size(), NEC_member_count);
+            ++ it;
+        }
+    } else {
+        while (it != cr_nodes->end()) {
+            score += it->second->size();
+            ++it;
+        }
+        score = score / (nontree_edges + 1);
+    }
+    return score;
+}
+
+void MatchingOrderPrint(MatchingOrderPq* pq) {
+    cout << " Matching Order " << endl;
+    cout << "Pq Size " << pq->size() << endl;
+    while (!pq->empty()) {
+        MatchingOrderPair* pair = pq->top();
+        pq->pop();
+        queue<NECNode*>* q = pair->q;
+        cout << "queue size " << q->size() << endl;
+        while (!q->empty()) {
+            cout << pair << " " << q->front() << " - ";
+            q->pop();
+        }
+        cout << endl;
+    }
+}
+
+MatchingOrderPq* MatchingOrder(NECNode* nec_root, CandidateRegions* cr) {
+    ULONG new_nontree_edges;
+    ULONG nontree_edges;
+    queue<NECNode*>* path;
+    NECNode* leaf_node;
+    NECNode* child;
+    vector<NECNode*>* NEC_to_visit;
+    pair<queue<NECNode*>*, ULONG>* p;
+    pair<queue<NECNode*>*, ULONG>* new_pair;
+    MatchingOrderPair* pq_elem;
+
+    queue<pair<queue<NECNode*>*, ULONG>* > bfs_queue;
+    MatchingOrderPq* pq = new MatchingOrderPq;
+    unordered_set<NECNode*> visited;
+    queue<NECNode*>* seed_queue = new queue<NECNode*>;
+
+    new_pair = new pair<queue<NECNode*>*, ULONG>;
+    new_pair->first = seed_queue;
+    new_pair->second = 0;
+    seed_queue->push(nec_root);
+    bfs_queue.push(new_pair);
+    visited.insert(nec_root);
+
+    while (bfs_queue.empty() == false) {
+        p = bfs_queue.front();
+        bfs_queue.pop();
+        path = p->first;
+        leaf_node = path->back();
+        NEC_to_visit = MatchingOrderGetUnvisited(leaf_node, &visited);
+        new_nontree_edges = leaf_node->parents->size() +
+                            leaf_node->children->size() -
+                            NEC_to_visit->size();
+        nontree_edges = p->second + new_nontree_edges;
+
+        for (int i = 1; i < NEC_to_visit->size(); i += 1) {
+            child = NEC_to_visit->at(i);
+            MatchingOrderVisitChild(child, path, nontree_edges, &bfs_queue, &visited);
+        }
+
+        if (NEC_to_visit->size() > 0) {
+            // Reuse allocated queue for 0-th child.
+            child = NEC_to_visit->at(0);
+            MatchingOrderVisitChild(child, path, nontree_edges, &bfs_queue, &visited);
+        }
+
+
+
+        if (NEC_to_visit->size() == 0) {
+            // End of path
+            pq_elem = new MatchingOrderPair;
+            pq_elem->q = path;
+            pq_elem->score = MatchingOrderCalcScore(path, nontree_edges, cr);
+            pq->push(pq_elem);
+
+            queue<NECNode*>* cp = new queue<NECNode*>(*path);
+            cout << "****** copied queue size: " << cp->size() << endl;
+            for (int i = cp->size(); i > 0; i -= 1) {
+                cout << cp->front() << endl;
+                cp->pop();
+            }
+            cout << "printed copied queue" << endl;
+    
+        }
+    }
+
+    return pq;
+}
+
+CandidateRegions* AllocCandidateRegions(DataGraph& dg, NECNode* nec_root, LABEL root_label) {
+    CandidateRegions* cr = new CandidateRegions;
+    unordered_set<VERTEX>* visited_vertices = new unordered_set<VERTEX>;
+    VERTEX root_node_id;
+    vector<VERTEX> candidate_data_vertices;
+    VERTEX* data_node_iter;
 
     data_node_iter = dg.vfs->GetVertexIterator(root_label);
     for(int data_node_index = 0; 
@@ -460,7 +617,6 @@ void TurboIso(DataGraph& dg, query_node_map* qg) {
         if(ExploreCandidateRegions(dg, nec_root, &candidate_data_vertices, 
                                    visited_vertices, cr, -1) == false)
         {
-            cout << "false" << endl;
             continue;
         }
         CandidateRegions::iterator it = cr->begin();
@@ -468,7 +624,7 @@ void TurboIso(DataGraph& dg, query_node_map* qg) {
             cout << "NEC NODE :" << it->first << " - \n";
             unordered_map<VERTEX, vector<VERTEX>*>::iterator it2 = it->second->begin();
             while (it2 != it->second->end()) {
-                cout << "\t\tDataNode vertex id: " << it2->first << " - ";
+                cout << "\t\tDataNode vertex prior: " << it2->first << " - ";
                 vector<VERTEX>* v = it2->second;
                 for (int i = 0; i < v->size(); i += 1) {
                     cout << v->at(i) << " ";
@@ -480,6 +636,23 @@ void TurboIso(DataGraph& dg, query_node_map* qg) {
         }
         // Iterate and print me
     }
+    return cr;
+}
+
+void TurboIso(DataGraph& dg, query_node_map* qg) {
+    QueryNode* start_vertex;
+    CandidateRegions* cr;
+    MatchingOrderPq* matching_order;
+    LABEL root_label;
+    unordered_set<NECNode*>* leaf_nec_nodes = new unordered_set<NECNode*>;
+    NECNode* nec_root;
+
+    start_vertex = GetStartingQueryVertex(dg, qg);
+    root_label = start_vertex->label;
+    nec_root = RewriteToNECTree(qg, start_vertex, leaf_nec_nodes);
+    cr = AllocCandidateRegions(dg, nec_root, root_label);
+    matching_order = MatchingOrder(nec_root, cr);
+    MatchingOrderPrint(matching_order);
 }
 
 int main() {
@@ -492,6 +665,8 @@ int main() {
     dg.efs = &efs;
 
     qg = ReadQueryGraphFromFile("query_graph.txt");
+    cout << "print query graph" << endl;
+    PrintQueryGraph(qg);
 
     TurboIso(dg, qg);
 }
