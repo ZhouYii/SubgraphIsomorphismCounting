@@ -18,11 +18,13 @@
 #define PARENT 1
 
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 #include <queue>
 #include <algorithm>
 #include "graph.cpp"
 #include "turboiso.h"
+//#include "combinators.cpp"
 
 /*
  * TYPEDEF

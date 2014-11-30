@@ -682,6 +682,8 @@ void TurboIso(DataGraph& dg, query_node_map* qg) {
         cout << matching_queue->at(i) << " ";
     }
     cout << endl;
+
+    XChoseY(matching_queue, 5);
 }
 
 int main() {
