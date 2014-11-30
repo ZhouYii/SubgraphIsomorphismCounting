@@ -447,11 +447,11 @@ vector<NECNode*>* MatchingOrderGetUnvisited(NECNode* leaf,
     return v;
 }
 
-void MatchingOrderVisitChild(NECNode* child, queue<NECNode*>* path, ULONG nontree_edges,
-                             queue<pair<queue<NECNode*>*, ULONG>*>* bfs_queue,
+void MatchingOrderVisitChild(NECNode* child, vector<NECNode*>* path, ULONG nontree_edges,
+                             queue<pair<vector<NECNode*>*, ULONG>*>* bfs_queue,
                              unordered_set<NECNode*>* visited) {
-    queue<NECNode*>* new_path;
-    pair<queue<NECNode*>*, ULONG>* new_pair;
+    vector<NECNode*>* new_path;
+    pair<vector<NECNode*>*, ULONG>* new_pair;
 
     if (visited->count(child) > 0) {
         // Already marked
@@ -459,18 +459,16 @@ void MatchingOrderVisitChild(NECNode* child, queue<NECNode*>* path, ULONG nontre
     }
 
     visited->insert(child);
-    new_path = new queue<NECNode*>(*path);
+    new_path = new vector<NECNode*>(*path);
 
-    queue<NECNode*>* cp = new queue<NECNode*>(*new_path);
-    cout << "*** copied queue size: " << cp->size() << endl;
-    for (int i = cp->size(); i > 0; i -= 1) {
-        cout << cp->front() << endl;
-        cp->pop();
-    }
+    // TODO : remove
+    cout << "*** copied vector size: " << new_path->size() << endl;
+    for (int i = 0; i < new_path->size(); i += 1)
+        cout << new_path->at(i) << endl;
     cout << "printed copied queue" << endl;
-    new_path->push(child);
 
-    new_pair = new pair<queue<NECNode*>*, ULONG>;
+    new_path->push_back(child);
+    new_pair = new pair<vector<NECNode*>*, ULONG>;
     new_pair->first = new_path;
     new_pair->second = nontree_edges;
     bfs_queue->push(new_pair);
@@ -488,14 +486,16 @@ ULONG xChoseY(ULONG x, ULONG y) {
 
 // TODO : New scoring that sums all NEC nodes not only leaf? Leaf 
 // may have few candidate but intermediate NEC may have many.
-ULONG MatchingOrderCalcScore(queue<NECNode*>* path, ULONG nontree_edges, CandidateRegions* cr) {
+ULONG MatchingOrderCalcScore(vector<NECNode*>* path, ULONG nontree_edges, CandidateRegions* cr) {
     unordered_map<VERTEX, vector<VERTEX>*>* cr_nodes;
     unordered_map<VERTEX, vector<VERTEX>*>::iterator it;
     NECNode* leaf = path->back();
     ULONG NEC_member_count = path->back()->members->size();
     ULONG score = 0;
 
-    cout << "Leaf: " << leaf << endl;
+    if (cr->count(leaf) == 0) {
+        cout << "Invalid candidate region" << endl;
+    }
     cr_nodes = cr->at(leaf);
     it = cr_nodes->begin();
     if ( NEC_member_count > 1) {
@@ -514,17 +514,42 @@ ULONG MatchingOrderCalcScore(queue<NECNode*>* path, ULONG nontree_edges, Candida
     return score;
 }
 
+vector<NECNode*>* GenerateNECOrder(MatchingOrderPq* path_pq) {
+    unordered_set<NECNode*> seen_nec;
+    vector<NECNode*>* nec_queue;
+    MatchingOrderPair* pair;
+    NECNode* curr_nec;
+    vector<NECNode*>* evaluation_queue = new vector<NECNode*>;
+
+    while (!path_pq->empty()) {
+        pair = path_pq->top();
+        path_pq->pop();
+        nec_queue = pair->q;
+        
+        for (int index = nec_queue->size() - 1; index >= 0; index -= 1) {
+            curr_nec = nec_queue->at(index);
+            if (seen_nec.count(curr_nec) > 0)
+                continue;
+
+            seen_nec.insert(curr_nec);
+            evaluation_queue->push_back(curr_nec);
+        }
+    }
+
+    return evaluation_queue;
+}
+
 void MatchingOrderPrint(MatchingOrderPq* pq) {
     cout << " Matching Order " << endl;
     cout << "Pq Size " << pq->size() << endl;
     while (!pq->empty()) {
         MatchingOrderPair* pair = pq->top();
         pq->pop();
-        queue<NECNode*>* q = pair->q;
-        cout << "queue size " << q->size() << endl;
-        while (!q->empty()) {
-            cout << pair << " " << q->front() << " - ";
-            q->pop();
+        vector<NECNode*>* q = pair->q;
+
+        cout << "path size " << q->size() << endl;
+        for (int i = 0; i < q->size(); i += 1) {
+            cout << pair << " " << q->at(i) << " - ";
         }
         cout << endl;
     }
@@ -533,23 +558,23 @@ void MatchingOrderPrint(MatchingOrderPq* pq) {
 MatchingOrderPq* MatchingOrder(NECNode* nec_root, CandidateRegions* cr) {
     ULONG new_nontree_edges;
     ULONG nontree_edges;
-    queue<NECNode*>* path;
+    vector<NECNode*>* path;
     NECNode* leaf_node;
     NECNode* child;
     vector<NECNode*>* NEC_to_visit;
-    pair<queue<NECNode*>*, ULONG>* p;
-    pair<queue<NECNode*>*, ULONG>* new_pair;
+    pair<vector<NECNode*>*, ULONG>* p;
+    pair<vector<NECNode*>*, ULONG>* new_pair;
     MatchingOrderPair* pq_elem;
 
-    queue<pair<queue<NECNode*>*, ULONG>* > bfs_queue;
+    queue<pair<vector<NECNode*>*, ULONG>* > bfs_queue;
     MatchingOrderPq* pq = new MatchingOrderPq;
     unordered_set<NECNode*> visited;
-    queue<NECNode*>* seed_queue = new queue<NECNode*>;
+    vector<NECNode*>* seed_queue = new vector<NECNode*>;
 
-    new_pair = new pair<queue<NECNode*>*, ULONG>;
+    new_pair = new pair<vector<NECNode*>*, ULONG>;
     new_pair->first = seed_queue;
     new_pair->second = 0;
-    seed_queue->push(nec_root);
+    seed_queue->push_back(nec_root);
     bfs_queue.push(new_pair);
     visited.insert(nec_root);
 
@@ -575,8 +600,6 @@ MatchingOrderPq* MatchingOrder(NECNode* nec_root, CandidateRegions* cr) {
             MatchingOrderVisitChild(child, path, nontree_edges, &bfs_queue, &visited);
         }
 
-
-
         if (NEC_to_visit->size() == 0) {
             // End of path
             pq_elem = new MatchingOrderPair;
@@ -584,14 +607,11 @@ MatchingOrderPq* MatchingOrder(NECNode* nec_root, CandidateRegions* cr) {
             pq_elem->score = MatchingOrderCalcScore(path, nontree_edges, cr);
             pq->push(pq_elem);
 
-            queue<NECNode*>* cp = new queue<NECNode*>(*path);
-            cout << "****** copied queue size: " << cp->size() << endl;
-            for (int i = cp->size(); i > 0; i -= 1) {
-                cout << cp->front() << endl;
-                cp->pop();
+            cout << "****** copied queue size: " << path->size() << endl;
+            for (int i = 0; i < path->size(); i += 1) {
+                cout << path->at(i) << endl;
             }
             cout << "printed copied queue" << endl;
-    
         }
     }
 
@@ -639,20 +659,29 @@ CandidateRegions* AllocCandidateRegions(DataGraph& dg, NECNode* nec_root, LABEL 
     return cr;
 }
 
+
 void TurboIso(DataGraph& dg, query_node_map* qg) {
     QueryNode* start_vertex;
     CandidateRegions* cr;
-    MatchingOrderPq* matching_order;
+    MatchingOrderPq* matching_order_pq;
     LABEL root_label;
     unordered_set<NECNode*>* leaf_nec_nodes = new unordered_set<NECNode*>;
     NECNode* nec_root;
+    vector<NECNode*>* matching_queue;
 
     start_vertex = GetStartingQueryVertex(dg, qg);
     root_label = start_vertex->label;
     nec_root = RewriteToNECTree(qg, start_vertex, leaf_nec_nodes);
     cr = AllocCandidateRegions(dg, nec_root, root_label);
-    matching_order = MatchingOrder(nec_root, cr);
-    MatchingOrderPrint(matching_order);
+    matching_order_pq = MatchingOrder(nec_root, cr);
+    // MatchingOrderPrint(matching_order);
+    matching_queue = GenerateNECOrder(matching_order_pq);
+    
+    cout << "NEC QUEUE :";
+    for (int i = 0; i < matching_queue->size(); i += 1) {
+        cout << matching_queue->at(i) << " ";
+    }
+    cout << endl;
 }
 
 int main() {

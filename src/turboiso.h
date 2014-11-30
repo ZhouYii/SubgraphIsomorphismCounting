@@ -2,7 +2,7 @@
 #define TURBOISO_H
 
 struct MatchingOrderPair {
-    queue<NECNode*>* q;
+    vector<NECNode*>* q;
     ULONG score;
 };
 struct RankingPair {
