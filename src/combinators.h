@@ -4,33 +4,33 @@
 class XChoseY {
     private :
         // Should not free this.
-        vector<NECNode*>* bucket;
+        vector<VERTEX>* bucket;
         vector<int>* iterators;
         int chose_num;
 
         int advanceOneIterator(int index);
 
     public :
-        XChoseY(vector<NECNode*>* bucket, int num_to_select);
+        XChoseY(vector<VERTEX>* bucket, int num_to_select);
         ~XChoseY();
-        vector<NECNode*>* getNext();
+        vector<VERTEX>* getNext();
 };
 
 // Many buckets, chose one from each. Unique.
 class ManyChoseOne {
     private :
         bool has_remaining;
-        vector<vector<NECNode*>*>* buckets;
+        vector<vector<VERTEX>*>* buckets;
         vector<int>* iterators;
 
         bool incrementBucketIterator(int bucket_index);
-        NECNode* getCurrentElemFromBucket(int bucket_index);
+        VERTEX getCurrentElemFromBucket(int bucket_index);
 
     public :
         ManyChoseOne();
         ~ManyChoseOne();
-        vector<NECNode*>* getNext();
-        void addBucket(vector<NECNode*>* bucket);
+        vector<VERTEX>* getNext();
+        void addBucket(vector<VERTEX>* bucket);
 };
 
 #endif

@@ -59,7 +59,8 @@ class EdgeFs
         void ConstructReverseEdges();
 
     public :
-        EdgeFs(const char* file_path, VertexFs* vfs);
+
+        EdgeFs(const char* file_path, const char* rev_file_path, VertexFs* vfs);
 
         // Mutators
         void FlipEdges();
@@ -69,6 +70,7 @@ class EdgeFs
         UINT* IncomingEdgeIterator(const UINT vertex_id);
         // Need to handle NULL
         UINT* OutgoingEdgeIterator(const UINT vertex_id, const LABEL label);
+        UINT* OutgoingEdgeIteratorEnd(const UINT vertex_id, const LABEL label);
         UINT* IncomingEdgeIterator(const UINT vertex_id, const LABEL label);
 
         UINT* OutgoingLabelIterator(const UINT vertex_id);
@@ -80,6 +82,8 @@ class EdgeFs
         UINT GetOutDegree(const UINT vertex_id);
         UINT GetInDegree(const UINT vertex_id, const LABEL l);
         UINT GetOutDegree(const UINT vertex_id, const LABEL l);
+
+        bool HasEdge(const VERTEX from, const VERTEX to);
 
 
         // Human readable,editable

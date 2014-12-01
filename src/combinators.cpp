@@ -4,12 +4,12 @@
 #include "defines.h"
 #include "combinators.h"
 
-XChoseY::XChoseY(vector<NECNode*>* bucket, int num_to_select) {
+XChoseY::XChoseY(vector<VERTEX>* bucket, int num_to_select) {
     this->bucket = bucket;
     this->chose_num = num_to_select;
     this->iterators = new vector<int>(num_to_select, 0);
     for (int i = 0; i < num_to_select; i += 1) {
-        this->iterators->at(i) += i;
+        this->iterators->at(i) = i;
     }
 }
 
@@ -18,17 +18,22 @@ XChoseY::~XChoseY() {
         delete iterators;
 }
 
-vector<NECNode*>* XChoseY::getNext() {
-    vector<NECNode*>* result;
+vector<VERTEX>* XChoseY::getNext() {
+    vector<VERTEX>* result;
     int index;
     int last_advanced_iterator;
+
+    // Insufficient choices case.
+    if (chose_num > bucket->size()) {
+        return NULL;
+    }
 
     // Done case.
     if (iterators == NULL) {
         return NULL;
     }
 
-    result = new vector<NECNode*>(chose_num, 0);
+    result = new vector<VERTEX>(chose_num, 0);
     for (int iter_num = 0; iter_num < chose_num; iter_num += 1) {
         index = this->iterators->at(iter_num);
         result->at(iter_num) = this->bucket->at(index);
@@ -73,7 +78,7 @@ int XChoseY::advanceOneIterator(int index) {
 }
 
 ManyChoseOne::ManyChoseOne() {
-    this->buckets = new vector<vector<NECNode*>*>;
+    this->buckets = new vector<vector<VERTEX>*>;
     this->iterators = new vector<int>;
     this->has_remaining = true;
 }
@@ -83,7 +88,7 @@ ManyChoseOne::~ManyChoseOne() {
     delete iterators;
 }
 
-void ManyChoseOne::addBucket(vector<NECNode*>* bucket) {
+void ManyChoseOne::addBucket(vector<VERTEX>* bucket) {
     buckets->push_back(bucket);
     iterators->push_back(0);
 }
@@ -108,27 +113,27 @@ bool ManyChoseOne::incrementBucketIterator(int bucket_num) {
     return result;
 }
 
-NECNode* ManyChoseOne::getCurrentElemFromBucket(int bucket_index) {
+VERTEX ManyChoseOne::getCurrentElemFromBucket(int bucket_index) {
     int index = iterators->at(bucket_index);
-    vector<NECNode*>* bucket = buckets->at(bucket_index);
+    vector<VERTEX>* bucket = buckets->at(bucket_index);
     return bucket->at(index);
 }
 
-vector<NECNode*>* ManyChoseOne::getNext() {
-    unordered_set<NECNode*> seen;
-    vector<NECNode*>* bucket;
+vector<VERTEX>* ManyChoseOne::getNext() {
+    unordered_set<VERTEX> seen;
+    vector<VERTEX>* bucket;
     int bucket_index;
     int bucket_num;
     bool done = false;
     bool bucket_index_reset;
-    NECNode* curr_nec;
-    vector<NECNode*>* result;
+    VERTEX curr_nec;
+    vector<VERTEX>* result;
 
     if (!this->has_remaining) {
         return NULL;
     }
 
-    result = new vector<NECNode*>(buckets->size(), 0);
+    result = new vector<VERTEX>(buckets->size(), 0);
     while (!done && this->has_remaining) {
         for (bucket_num = 0; bucket_num < buckets->size(); bucket_num += 1) {
             bucket_index_reset = false;

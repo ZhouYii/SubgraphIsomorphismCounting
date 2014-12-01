@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <queue>        // std::priority_queue
+#include <ctime>
 #include <boost/foreach.hpp>
 #include <unordered_set>
 
@@ -63,15 +64,15 @@ QueryNode* GetStartingQueryVertex(DataGraph& dg, query_node_map* qg) {
     return tmp;
 }
 
-void GetSortedNeighborLabels(vector<QueryNode*>* nodes, vector<LABEL>* labels) {
-    QueryNode* adj_node;
-    for(int i = 0; i < nodes->size(); i += 1) {
-        adj_node = nodes->at(i);
-        labels->push_back(adj_node->label);
-    }
+/*
+void GetSortedNeighbors(vector<QueryNode*>* nodes, vector<QueryNode*>* els) {
+    for(int i = 0; i < nodes->size(); i += 1)
+        labels->push_back(nodes->at(i));
+
     // Sort Ascending. Order doesn't actually matter.
     sort(labels->begin(), labels->end());
 }
+*/
 
 vector<NECNode*>* MatchNECNodes(NECBucketMap* node_buckets) {
     vector<NECNode*>* nec_nodes;
@@ -80,6 +81,7 @@ vector<NECNode*>* MatchNECNodes(NECBucketMap* node_buckets) {
     vector<LABEL> nec_parent_labels;
     vector<LABEL> cmp_child_labels;
     vector<LABEL> cmp_parent_labels;
+    QueryNode* query_node;
     QueryNode* origin_node;
     QueryNode* cmp_node;
     NECNode* nec_node;
@@ -88,6 +90,12 @@ vector<NECNode*>* MatchNECNodes(NECBucketMap* node_buckets) {
     for(NECBucketMap::iterator it = node_buckets->begin(); 
         it != node_buckets->end(); ++it) {
         query_nodes = it->second;
+
+        for (int index = 0; index < query_nodes->size(); index += 1) {
+            query_node = query_nodes->at(index);
+            sort(query_node->children->begin(), query_node->children->end());
+            sort(query_node->parents->begin(), query_node->parents->end());
+        }
 
         while(query_nodes->size() > 0) {
             origin_node = query_nodes->back();
@@ -99,17 +107,16 @@ vector<NECNode*>* MatchNECNodes(NECBucketMap* node_buckets) {
             // Get adjacent information
             // This is the slow path. Take this after the hash path :
             // TODO : two separate hashes for parent and child labels
-            GetSortedNeighborLabels(origin_node->children, &nec_child_labels);
-            GetSortedNeighborLabels(origin_node->parents, &nec_parent_labels);
 
             // Iterate over all remaining nodes in vector (in reverse) to find
             for(int node_index = query_nodes->size() - 1;
-                node_index >= 0; node_index -= 1) {
+                node_index >= 0; node_index -= 1) 
+            {
                 cmp_node = query_nodes->at(node_index);
-                GetSortedNeighborLabels(cmp_node->children, &cmp_child_labels);
-                GetSortedNeighborLabels(cmp_node->parents, &cmp_parent_labels);
-                if (cmp_child_labels == nec_child_labels &&
-                    cmp_parent_labels == nec_parent_labels) {
+                // Not sorting labels but memory addresses. This ensures same
+                // adjacent query nodes in each NEC
+                if (*(origin_node->children) == *(cmp_node->children) &&
+                    *(origin_node->parents) == *(cmp_node->parents)) {
                     query_nodes->erase(query_nodes->begin() + node_index);
                     nec_node->members->push_back(cmp_node);
                 }
@@ -133,6 +140,7 @@ vector<NECNode*>* GenerateNECNodes(unordered_set<QueryNode*>* pnodes,
     QueryNode* curr_node;
     
     unordered_set<QueryNode*>::iterator it = pnodes->begin();
+    // Group Query Nodes by NEC
     for(; it != pnodes->end(); ++it) {
         curr_node = *(it);
 
@@ -177,8 +185,7 @@ unordered_set<QueryNode*>* GetAdjacentParentQueryNodes(NECNode* n) {
     return s;
 }
 
-NECNode* RewriteToNECTree(query_node_map* qg, QueryNode* start, 
-                          unordered_set<NECNode*>* leaf_nec_nodes) {
+NECNode* RewriteToNECTree(query_node_map* qg, QueryNode* start) {
     NECNode* curr;
     NECNode* root;
     vector<NECNode*>* curr_level_nec = new vector<NECNode*>;
@@ -219,10 +226,7 @@ NECNode* RewriteToNECTree(query_node_map* qg, QueryNode* start,
                 next_level_nec->push_back(parents->at(i));
             delete adj_query_nodes;
 
-            if (curr->children->size() == 0) {
-                leaf_nec_nodes->insert(curr);
-            }
-
+            /*
             cout << "NEC Node ID :" << curr << " Children:";
             for (int i = 0; i < curr->children->size(); i += 1) {
                 cout << curr->children->at(i) << " | ";
@@ -236,6 +240,7 @@ NECNode* RewriteToNECTree(query_node_map* qg, QueryNode* start,
                 cout << curr->members->at(i) << " | ";
             }
             cout << endl;
+            */
         }
     } while (curr_level_nec->size() > 0);
 
@@ -303,19 +308,19 @@ void InsertIntoCandidateRegion(CandidateRegions* cr,
                                VERTEX vertex_id) {
     unordered_map<VERTEX, vector<VERTEX>*>* prior_vertex_map;
 
-    cout << "Insert into candidate regions: parent - " << parent << " vertex - " << nec_node << endl;
+    //cout << "Insert into candidate regions: parent - " << parent << " vertex - " << nec_node << endl;
 
     if (cr->count(nec_node) == 0) {
         cr->insert(make_pair<NECNode*, unordered_map<VERTEX, vector<VERTEX>*>*>
                         (nec_node, new unordered_map<VERTEX, vector<VERTEX>*>));
-        cout << "CR ADD " << nec_node << endl;
+        //cout << "CR ADD " << nec_node << endl;
     }
 
     prior_vertex_map = cr->find(nec_node)->second;
     if (prior_vertex_map->count(parent) == 0) {
         prior_vertex_map->insert(make_pair<VERTEX, vector<VERTEX>*>
                                           (parent, new vector<VERTEX>));
-        cout << "CR PARENT ADD " << parent << endl;
+        //cout << "CR PARENT ADD " << parent << endl;
     }
     prior_vertex_map->find(parent)->second->push_back(vertex_id);
 }
@@ -369,11 +374,13 @@ bool ExploreCandidateRegions(DataGraph& dg, NECNode* nec_root,
     VERTEX data_node_id;
     bool matched;
 
+    /*
     cout << "CR - Data node candidates " ;
     for (int i = 0; i < data_node_candidates->size(); i += 1) {
         cout << data_node_candidates->at(i) << " ";
     }
     cout << endl;
+    */
     it = data_node_candidates->begin();
     for(; it != data_node_candidates->end(); ++it) {
         data_node_id = *(it);
@@ -406,7 +413,7 @@ bool ExploreCandidateRegions(DataGraph& dg, NECNode* nec_root,
 
         marked_vertex->erase(data_node_id);
         if (matched == false) {
-            cout << "Matched False :" << parent << " , " << nec_root << endl;
+            //cout << "Matched False :" << parent << " , " << nec_root << endl;
             continue;
         }
 
@@ -414,8 +421,8 @@ bool ExploreCandidateRegions(DataGraph& dg, NECNode* nec_root,
         InsertIntoCandidateRegion(cr, parent, nec_root, data_node_id);
     }
 
-    cout << "Query:" << nec_root << "_Parent:" << parent << " ";
-    cout << cr->count(nec_root) << endl;
+    //cout << "Query:" << nec_root << "_Parent:" << parent << " ";
+    //cout << cr->count(nec_root) << endl;
 
     if (cr->count(nec_root) == 0) {
         return false;
@@ -460,12 +467,6 @@ void MatchingOrderVisitChild(NECNode* child, vector<NECNode*>* path, ULONG nontr
 
     visited->insert(child);
     new_path = new vector<NECNode*>(*path);
-
-    // TODO : remove
-    cout << "*** copied vector size: " << new_path->size() << endl;
-    for (int i = 0; i < new_path->size(); i += 1)
-        cout << new_path->at(i) << endl;
-    cout << "printed copied queue" << endl;
 
     new_path->push_back(child);
     new_pair = new pair<vector<NECNode*>*, ULONG>;
@@ -607,11 +608,13 @@ MatchingOrderPq* MatchingOrder(NECNode* nec_root, CandidateRegions* cr) {
             pq_elem->score = MatchingOrderCalcScore(path, nontree_edges, cr);
             pq->push(pq_elem);
 
+            /*
             cout << "****** copied queue size: " << path->size() << endl;
             for (int i = 0; i < path->size(); i += 1) {
                 cout << path->at(i) << endl;
             }
             cout << "printed copied queue" << endl;
+            */
         }
     }
 
@@ -630,6 +633,7 @@ CandidateRegions* AllocCandidateRegions(DataGraph& dg, NECNode* nec_root, LABEL 
         data_node_index < dg.vfs->NumVertices(root_label); 
         data_node_index += 1)
     {
+        // TODO : FILTER data nodes based on NEC characteristics.
         root_node_id = *(data_node_iter + data_node_index);
         candidate_data_vertices.clear();
         candidate_data_vertices.push_back(root_node_id);
@@ -639,6 +643,8 @@ CandidateRegions* AllocCandidateRegions(DataGraph& dg, NECNode* nec_root, LABEL 
         {
             continue;
         }
+
+        /*
         CandidateRegions::iterator it = cr->begin();
         while (it != cr->end()) {
             cout << "NEC NODE :" << it->first << " - \n";
@@ -653,52 +659,418 @@ CandidateRegions* AllocCandidateRegions(DataGraph& dg, NECNode* nec_root, LABEL 
                 it2++;
             }
             it ++;
-        }
+        }*/
         // Iterate and print me
     }
     return cr;
 }
 
+bool SubGraphChildrenReferences(vector<VERTEX>* children, 
+                                VERTEX data_node,
+                                DataGraph& dg) {
+
+    VERTEX child;
+    for (int i = 0; i < children->size(); i += 1) {
+        child = children->at(i);
+        if (!dg.efs->HasEdge(data_node, child)) {
+            //cout << "no edge from " << data_node << " to " << child << endl;
+            return false;
+        }
+    }
+
+    return true;
+}
+
+vector<VERTEX>* SubGraphDataVertexUnion(vector<vector<VERTEX>*>* collections,
+                                        unordered_set<VERTEX>* marked_data_vertex,
+                                        vector<VERTEX>* matched_child_dnodes,
+                                        DataGraph& dg) 
+{
+    vector<VERTEX>* vec;
+    VERTEX data_node;
+    VERTEX matched_node;
+    unordered_set<VERTEX>* result = new unordered_set<VERTEX>;
+    for (int i = 0; i < collections->size(); i += 1) {
+        vec = collections->at(i);
+        for (int j = 0; j < vec->size(); j += 1) {
+            data_node = vec->at(j);
+            if (marked_data_vertex->count(data_node) == 0 &&
+                SubGraphChildrenReferences(matched_child_dnodes, data_node, dg))
+            {
+                result->insert(data_node);
+            }
+        }
+    }
+
+    for (int i = 0; i < matched_child_dnodes->size(); i += 1) {
+        matched_node = matched_child_dnodes->at(i);
+        if (result->count(matched_node) > 0) {
+            result->erase(matched_node);
+        }
+    }
+    vector<VERTEX>* ret = new vector<VERTEX>(result->begin(), result->end());
+    return ret;
+}
+
+vector<VERTEX>* SubGraphDataVertexIntersection(vector<vector<VERTEX>*>* collections,
+                                               unordered_set<VERTEX>* marked_data_vertex,
+                                               vector<VERTEX>* matched_child_dnodes,
+                                               DataGraph& dg) 
+{
+    if (collections->size() == 0)
+        return NULL;
+
+    vector<VERTEX>* seed = collections->at(0);
+    VERTEX matched_node;
+    unordered_set<VERTEX>* result = new unordered_set<VERTEX>();
+    unordered_set<VERTEX>::iterator it;
+
+    for (int i = 0; i < seed->size(); i += 1) {
+        matched_node = seed->at(i);
+        if (marked_data_vertex->count(matched_node) == 0 &&
+            SubGraphChildrenReferences(matched_child_dnodes, matched_node, dg))
+        {
+            result->insert(seed->at(i));
+        }
+    }
+
+    for (int i = 1; i < collections->size(); i += 1) {
+        seed = collections->at(i);
+        unordered_set<VERTEX> cmp = unordered_set<VERTEX>(seed->begin(), seed->end());
+        it = result->begin();
+        while (it != result->end()) {
+            if (cmp.count(*(it)) == 0) {
+                it++;
+            } else {
+                it = result->erase(it);
+            }
+        }
+    }
+    return NULL;
+}
+
+// Sort datanode vertices for std::set_intersection
+void SortCr(CandidateRegions* cr) {
+    CandidateRegions::iterator it1 = cr->begin();
+    unordered_map<VERTEX,vector<VERTEX>*>::iterator it2;
+
+    while (it1 != cr->end()) {
+        it2 = it1->second->begin();
+        while (it2 != it1->second->end()) {
+            sort(it2->second->begin(), it2->second->end());
+        }
+    }
+}
+
+vector<VERTEX>* SubGraphGetMatchedChildren(NECNode* nec, 
+                                           unordered_set<NECNode*>* matched_nec,
+                                           unordered_map<QueryNode*, VERTEX>* mapping) 
+{
+    vector<VERTEX>* matched_child_dnodes = new vector<VERTEX>;
+    NECNode* neighbor;
+    QueryNode* query_node;
+
+    // Get matched child query vertices
+    for (int i = 0; i < nec->children->size(); i += 1) {
+        neighbor = nec->children->at(i);
+        if (matched_nec->count(neighbor) == 0)
+            continue;
+
+        for (int member_index = 0;
+             member_index < neighbor->members->size();
+             member_index += 1)
+        {
+            query_node = neighbor->members->at(member_index);
+            matched_child_dnodes->push_back(mapping->at(query_node));
+        }
+    }
+    return matched_child_dnodes;
+}
+
+
+
+bool SubGraphCountCRCmp(vector<VERTEX>* v1, vector<VERTEX>* v2) {
+    return (v1->size() < v2->size());
+}
+
+// Get candidate data vertex for a NEC node
+vector<VERTEX>* SubGraphCountGetDataVertex(NECNode* nec, 
+                                unordered_map<QueryNode*, VERTEX>* mapping,
+                                unordered_set<NECNode*>* matched_nec,
+                                unordered_set<VERTEX>* marked_data_vertex,
+                                CandidateRegions* cr,
+                                DataGraph& dg)
+{
+    NECNode* neighbor;
+    QueryNode* query_node;
+    VERTEX mapped_data_node;
+    unordered_map<VERTEX, vector<VERTEX>*>* nec_cr_map;
+    unordered_map<VERTEX, vector<VERTEX>*>::iterator cr_iter;
+    vector<vector<VERTEX>*> valid_candidate_regions;
+    vector<VERTEX>* matched_child_dnodes;
+
+    // NEC doesn't exist. Means there was no valid CR.
+    if (cr->count(nec) == 0) {
+        return NULL;
+    }
+
+    nec_cr_map = cr->at(nec);
+    matched_child_dnodes = SubGraphGetMatchedChildren(nec, matched_nec, mapping);
+
+    /*
+    cout << "MATCHED CHILD QUERY NODES " ;
+    for (int i = 0; i < matched_child_dnodes->size(); i += 1) {
+        cout << matched_child_dnodes->at(i) << " - ";
+    }
+    cout << endl;
+    */
+    // Find candidate data vertex based on pre-matched query vertex
+    for (int i = 0; i < nec->parents->size(); i += 1) {
+        neighbor = nec->parents->at(i);
+        if (matched_nec->count(neighbor) == 0)
+            continue;
+
+        for (int member_index = 0;
+             member_index < neighbor->members->size();
+             member_index += 1)
+        {
+            query_node = neighbor->members->at(member_index);
+            // If NEC has been matched, all of it's query vertex must be
+            // matched as well.
+            mapped_data_node = mapping->at(query_node);
+            if (nec_cr_map->count(mapped_data_node) > 0) {
+                valid_candidate_regions
+                    .push_back(nec_cr_map->at(mapped_data_node));
+            }
+        }
+    }
+
+    // If no candidate data vertex were found, means no neighbor NEC are matched
+    // so take CR(u,*) for candidate data vertex
+    if (valid_candidate_regions.size() == 0) {
+        cr_iter = nec_cr_map->begin();
+        while (cr_iter != nec_cr_map->end()) {
+            valid_candidate_regions.push_back(cr_iter->second);
+            cr_iter ++;
+        }
+        return SubGraphDataVertexUnion(&valid_candidate_regions, 
+                                       marked_data_vertex, 
+                                       matched_child_dnodes,
+                                       dg);
+    } else {
+        // Sort CR vector by size for join order.
+        sort (valid_candidate_regions.begin(),
+              valid_candidate_regions.end(),
+              SubGraphCountCRCmp);
+        return SubGraphDataVertexIntersection(&valid_candidate_regions, 
+                                              marked_data_vertex,
+                                              matched_child_dnodes,
+                                              dg);
+    }
+}
+
+bool SubGraphIsJoinable(QueryNode* qnode, VERTEX dnode, 
+                        unordered_map<QueryNode*, VERTEX>* mapping,
+                        DataGraph& dg) 
+{
+    QueryNode* adj_node;
+    VERTEX mapped_node;
+
+    // Verify parents. Most likely neglected edges from NEC construction.
+    for (int p_index = 0; p_index < qnode->parents->size(); p_index += 1) {
+        adj_node = qnode->parents->at(p_index);
+        if (mapping->count(adj_node) > 0) {
+            mapped_node = mapping->at(adj_node);
+            if (!dg.efs->HasEdge(mapped_node, dnode)) {
+                return false;
+            }
+        }
+    }
+
+    for (int c_index = 0; c_index < qnode->children->size(); c_index += 1) {
+        adj_node = qnode->children->at(c_index);
+        if (mapping->count(adj_node) > 0) {
+            mapped_node = mapping->at(adj_node);
+            if (!dg.efs->HasEdge(dnode, mapped_node)) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+void SubGraphMapping(unordered_map<QueryNode*, VERTEX>* mapping,
+                     vector<VERTEX>* combination,
+                     NECNode* nec_node,
+                     unordered_set<NECNode*>* matched_nec,
+                     unordered_set<VERTEX>* marked_data_vertex)
+{
+    QueryNode* qnode;
+    matched_nec->insert(nec_node);
+    for (int i = 0; i < nec_node->members->size(); i += 1) {
+        qnode = nec_node->members->at(i);
+        mapping->insert(make_pair<QueryNode*, VERTEX>(qnode, combination->at(i)));
+        marked_data_vertex->insert(combination->at(i));
+    }
+
+}
+void SubGraphRestore(unordered_map<QueryNode*, VERTEX>* mapping,
+                     vector<VERTEX>* combination,
+                     NECNode* nec_node,
+                     unordered_set<NECNode*>* matched_nec,
+                     unordered_set<VERTEX>* marked_data_vertex)
+{
+    QueryNode* qnode;
+    matched_nec->erase(nec_node);
+    for (int i = 0; i < nec_node->members->size(); i += 1) {
+        qnode = nec_node->members->at(i);
+        mapping->erase(qnode);
+        marked_data_vertex->erase(combination->at(i));
+    }
+
+}
+
+void SubGraphPrintMapping(unordered_map<QueryNode*, VERTEX>* mapping) {
+    unordered_map<QueryNode*, VERTEX>::iterator it = mapping->begin();
+    while (it != mapping->end()) {
+        cout << it->second << " - ";
+        it++;
+    }
+    cout << endl;
+}
+
+int SubGraphCount(vector<NECNode*>* matching_order, int matching_index,
+                   unordered_map<QueryNode*, VERTEX>* mapping, 
+                   unordered_set<NECNode*>* matched_nec,
+                   unordered_set<VERTEX>* marked_data_vertex,
+                   CandidateRegions* cr,
+                   DataGraph& dg) 
+{
+    NECNode* curr_nec;
+    vector<VERTEX>* candidate_data_vertex;
+    vector<VERTEX>* combination;
+    bool matched;
+    int count = 0;
+    curr_nec = matching_order->at(matching_index);
+    candidate_data_vertex = SubGraphCountGetDataVertex(curr_nec, mapping,
+                                                       matched_nec,
+                                                       marked_data_vertex,
+                                                       cr,
+                                                       dg);
+
+    /*
+    cout << "NEC:" << curr_nec << " CANIDATE SIZE" << candidate_data_vertex->size() <<  endl;
+    cout << "DATA VERTEX CANDIDATE:";
+    for (int i = 0; i < candidate_data_vertex->size(); i += 1) {
+        cout << candidate_data_vertex->at(i) << " - ";
+    }
+    cout << endl;
+    */
+    XChoseY combinations = XChoseY(candidate_data_vertex, curr_nec->members->size());
+    combination = combinations.getNext();
+
+    while (combination != NULL) {
+        /*
+        cout << "Combination :";
+        for (int i = 0; i < combination->size(); i += 1)
+            cout << combination->at(i) << " - ";
+        cout << endl;
+        */
+
+        matched = true;
+        for (int i = 0; i < combination->size(); i += 1) {
+            if (!SubGraphIsJoinable(curr_nec->members->at(i), 
+                                   combination->at(i),
+                                   mapping,
+                                   dg))
+            {
+                matched = false;
+                break;
+            }
+        }
+
+        if (!matched) {
+            combination = combinations.getNext();
+            continue;
+        }
+
+        SubGraphMapping(mapping, combination, curr_nec, matched_nec, 
+                        marked_data_vertex);
+
+        if (matching_index == matching_order->size() - 1) {
+            //SubGraphPrintMapping(mapping);
+            count += 1;
+        } else {
+            count += SubGraphCount(matching_order, matching_index + 1, 
+                                   mapping, matched_nec, 
+                                   marked_data_vertex, cr, dg);
+        }
+        SubGraphRestore(mapping, combination, curr_nec, matched_nec, 
+                        marked_data_vertex);
+
+        combination = combinations.getNext();
+    }
+    return count;
+}
 
 void TurboIso(DataGraph& dg, query_node_map* qg) {
     QueryNode* start_vertex;
+    LABEL root_label;
+    NECNode* nec_root;
     CandidateRegions* cr;
     MatchingOrderPq* matching_order_pq;
-    LABEL root_label;
-    unordered_set<NECNode*>* leaf_nec_nodes = new unordered_set<NECNode*>;
-    NECNode* nec_root;
     vector<NECNode*>* matching_queue;
+    unordered_set<NECNode*> matched_NEC;
+    unordered_map<QueryNode*, VERTEX> query_node_mapping;
+    unordered_set<VERTEX> marked_data_vertex;
 
+    cout << "start vertex" << endl;
+    // Get starting query vertex for NEC tree construction
     start_vertex = GetStartingQueryVertex(dg, qg);
+
+
+    cout << "nec tree" << endl;
+    // Construct NEC tree and populate CR
     root_label = start_vertex->label;
-    nec_root = RewriteToNECTree(qg, start_vertex, leaf_nec_nodes);
+    nec_root = RewriteToNECTree(qg, start_vertex);
+    cout << "cr" << endl;
     cr = AllocCandidateRegions(dg, nec_root, root_label);
+    //SortCr(cr);
+    //
+    cout << "match order" << endl;
+    // Get Matching Order for NEC
     matching_order_pq = MatchingOrder(nec_root, cr);
-    // MatchingOrderPrint(matching_order);
     matching_queue = GenerateNECOrder(matching_order_pq);
     
-    cout << "NEC QUEUE :";
-    for (int i = 0; i < matching_queue->size(); i += 1) {
-        cout << matching_queue->at(i) << " ";
-    }
-    cout << endl;
-
-    XChoseY(matching_queue, 5);
+    cout << "count subgraph" << endl;
+    // Count SubGraphs
+    matched_NEC.clear();
+    query_node_mapping.clear();
+    int answer = SubGraphCount(matching_queue, 0, &query_node_mapping, &matched_NEC,
+                  &marked_data_vertex, cr, dg);
+    cout << "COUNT: " << answer << endl;
 }
 
 int main() {
     DataGraph dg;
     query_node_map* qg;
 
-    VertexFs vfs("test.txt");
-    EdgeFs efs("test_efs.txt", &vfs);
+    VertexFs vfs("dblp_vfs");
+    EdgeFs efs("dblp_efs.txt", "dblp_efs_rev.txt", &vfs);
     dg.vfs = &vfs;
     dg.efs = &efs;
 
     qg = ReadQueryGraphFromFile("query_graph.txt");
+    /*
     cout << "print query graph" << endl;
     PrintQueryGraph(qg);
+    */
 
+    clock_t begin = clock();
     TurboIso(dg, qg);
+    clock_t end = clock();
+    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+    cout << "secs:" << elapsed_secs << endl;
+
 }
 #endif

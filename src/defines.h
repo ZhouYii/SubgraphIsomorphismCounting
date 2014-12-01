@@ -24,7 +24,7 @@
 #include <algorithm>
 #include "graph.cpp"
 #include "turboiso.h"
-//#include "combinators.cpp"
+#include "combinators.cpp"
 
 /*
  * TYPEDEF
