@@ -1176,11 +1176,11 @@ int TurboIso(DataGraph& dg, QueryGraph* query_graph) {
     vector<NECNode*> initialized_nec;
     int result;
 
-    cout << "start vertex" << endl;
+    //cout << "start vertex" << endl;
     // Get starting query vertex for NEC tree construction
     start_vertex = GetStartingQueryVertex(dg, query_graph);
 
-    cout << "nec tree" << endl;
+    //cout << "nec tree" << endl;
     // Construct NEC tree and populate CR
     root_label = start_vertex->label;
     nec_root = RewriteToNECTree(query_graph, start_vertex, initialized_nec);
@@ -1188,7 +1188,7 @@ int TurboIso(DataGraph& dg, QueryGraph* query_graph) {
     PrintNECTree(nec_root);
 #endif
 
-    cout << "cr" << endl;
+    //cout << "cr" << endl;
     // Takes argument of matched query nodes-NEC and generates special CR.
     cr = AllocCandidateRegions(dg, query_graph, nec_root, root_label, initialized_nec);
     if (cr == NULL) {
@@ -1197,64 +1197,66 @@ int TurboIso(DataGraph& dg, QueryGraph* query_graph) {
 #ifdef PRINT_ON
         PrintCandidateRegions(cr);
 #endif
-        cout << "match order" << endl;
+        //cout << "match order" << endl;
         matching_order_pq = MatchingOrder(nec_root, cr);
         matching_queue = GenerateNECOrder(matching_order_pq, initialized_nec);
 
-        cout << "count subgraph" << endl;
+        //cout << "count subgraph" << endl;
         matched_NEC.clear();
         query_node_mapping.clear();
         result = SubGraphCount(matching_queue, 0, &query_node_mapping, &matched_NEC,
                       &marked_data_vertex, cr, dg);
-        cout << "COUNT: " << result << endl;
+        //cout << "COUNT: " << result << endl;
     }
 
     return result;
 }
 
-int main() {
+int main(int argc, char** argv) {
     DataGraph dg;
-    QueryGraph* qg;
+    QueryGraph* qg5;
+    string line;
     int result;
+    clock_t clock_begin;
+    clock_t clock_end;
+    double elapsed_time;
+
+    /*
+    if (argc < 1)
+        // Need at least query graph
+        return 1;
+    */
 
     VertexFs vfs("dblp_vfs");
     EdgeFs efs("dblp_efs.txt", "dblp_efs_rev.txt", &vfs);
     dg.vfs = &vfs;
     dg.efs = &efs;
 
-    qg = ReadQueryGraphFromFile("query_graph2.txt");
-    cout << qg->initialized_query_nodes->size() << endl;
-    /*
-    cout << "print query graph" << endl;
-    PrintQueryGraph(qg);
-    */
+    //qg = ReadQueryGraphFromFile(argv[1]);
+    qg5 = ReadQueryGraphFromFile("query_graph5.txt");
+    ifstream author_file("author_list");
+    ofstream querygraph5("qg5_out");
 
-    clock_t begin = clock();
-    result = TurboIso(dg, qg);
-    clock_t end = clock();
-    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-    cout << "milli-secs:" << 1000*elapsed_secs << endl;
-    cout << result << endl;
+    while (getline(author_file, line)) {
+        unordered_map<QueryNode*, UINT>::iterator it;
+        it = qg5->initialized_query_nodes->begin();
+        it->second = stoul(line);
 
-    vector<string> elems;
-    vector<VERTEX> vec;
-    int acl = 3908727;
-    string a = "1252583-1252596-1743564-2469422-2527655-2560018-2948953-2982677-2982724-3014232-3014629-3114289-3114358-3114570-3114571-3123564-3176891-3180694-3180755-3228579-3228618-3363355-3383127-3409071-3520445-3565094-3565119-3592923-3606126-3631453-3658050-3663455-3663496-3670316-3756949-3765794-3766141";
-    SplitString(a, '-', elems);
-    for (int i = 0; i < elems.size() ; i += 1) {
-        vec.push_back(stoul(elems[i]));
-        cout << vec[i] << endl;
-        UINT* out1 = efs.OutgoingEdgeIterator(vec[i], 2);
-        UINT* out2 = efs.OutgoingEdgeIteratorEnd(vec[i], 2);
-        while (out1 != out2) {
-            cout << '\t' << *(out1);
-            if (*(out1) == acl) {
-                cout << "  Match " << endl;
-            }
-            cout << endl;
-            out1++;
-        }
+        /*
+        cout << qg->initialized_query_nodes->size() << endl;
+        cout << "print query graph" << endl;
+        PrintQueryGraph(qg);
+        */
+
+        clock_begin = clock();
+        result = TurboIso(dg, qg5);
+        clock_end = clock();
+        elapsed_time = double(clock_end - clock_begin) / CLOCKS_PER_SEC;
+        querygraph5 << 1000*elapsed_time << "," << result << endl;
+
+        querygraph5.flush();
     }
-
+    querygraph5.close();
+//    cout << result << endl;
 }
 #endif

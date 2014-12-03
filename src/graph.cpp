@@ -92,9 +92,10 @@ QueryGraph* ReadQueryGraphFromFile(const char* file_path) {
         vertex->children = new vector<QueryNode*>;
         map->insert(query_node_map::value_type(stoul(str_buf[0]), vertex));
         str_buf.clear();
-
+#ifdef PRINT_ON
         cout << "QueryNode Mapping :"<< stoul(str_buf[0]) << "-";
         cout << vertex << endl;
+#endif
     }
     // Parse adjacency list
     while (getline(file,line)) {
@@ -133,13 +134,14 @@ QueryGraph* ReadQueryGraphFromFile(const char* file_path) {
         str_buf.clear();
     }
 
+#ifdef PRINT_ON
     cout << "initialized size: " << initialized->size() << endl;
     unordered_map<QueryNode*,UINT>::iterator it = initialized->begin();
     while (it != initialized->end()) {
         cout << it->first << " " << it->second << endl;
         ++it;
     }
-
+#endif
 
     return qg;
 }
