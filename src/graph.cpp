@@ -28,9 +28,16 @@ struct NECNode {
 
 typedef std::unordered_map<UINT, QueryNode*> query_node_map;
 
+struct QueryGraph {
+    query_node_map* query_nodes;
+    unordered_map<QueryNode*, UINT>* initialized_query_nodes;
+};
+
 NECNode* NECNodeInit() {
     NECNode* nec_node = new NECNode;
     nec_node->members = new vector<QueryNode*>;
+    nec_node->children = new vector<NECNode*>;
+    nec_node->parents = new vector<NECNode*>;
     return nec_node;
 }
 
@@ -60,18 +67,22 @@ void PrintQueryGraph(query_node_map* qm) {
     }
 }
 
-query_node_map* ReadQueryGraphFromFile(const char* file_path) {
+QueryGraph* ReadQueryGraphFromFile(const char* file_path) {
+    QueryGraph* qg = new QueryGraph;
     query_node_map* map = new query_node_map;
+    unordered_map<QueryNode*, UINT>* initialized = new unordered_map<QueryNode*, UINT>;
     QueryNode* vertex;
     string line;
     vector<string> str_buf;
 
+    qg->query_nodes = map;
+    qg->initialized_query_nodes = initialized;
     ifstream file(file_path);
     // Parse node id and labels
-    while(getline(file,line)) {
-        if(line[0] == '#')
+    while (getline(file,line)) {
+        if (line[0] == '#')
             continue;
-        if(line.length() == 0)
+        if (line.length() == 0)
             break;
 
         SplitString(line, '\t', str_buf);
@@ -86,10 +97,13 @@ query_node_map* ReadQueryGraphFromFile(const char* file_path) {
         cout << vertex << endl;
     }
     // Parse adjacency list
-    while(getline(file,line)) {
-        if(line[0] == '#') {
+    while (getline(file,line)) {
+        if (line[0] == '#') {
             continue;
         }
+
+        if (line.length() == 0)
+            break;
 
         SplitString(line, '\t', str_buf);
         vertex = map->find(stoul(str_buf[0]))->second;
@@ -99,8 +113,35 @@ query_node_map* ReadQueryGraphFromFile(const char* file_path) {
         }
         str_buf.clear();
     }
+    // Parse initialized query vertices.
+    while (getline(file,line)) {
+        if (line[0] == '#') {
+            continue;
+        }
 
-    return map;
+        if (line.length() == 0)
+            break;
+
+        SplitString(line, '\t', str_buf);
+
+        UINT qnode_id = stoul(str_buf[0]);
+        UINT dnode_id = stoul(str_buf[1]);
+        if (map->count(qnode_id) > 0) {
+            QueryNode* qnode = map->at(qnode_id);
+            initialized->insert(make_pair<QueryNode*, UINT>(qnode, dnode_id));
+        }
+        str_buf.clear();
+    }
+
+    cout << "initialized size: " << initialized->size() << endl;
+    unordered_map<QueryNode*,UINT>::iterator it = initialized->begin();
+    while (it != initialized->end()) {
+        cout << it->first << " " << it->second << endl;
+        ++it;
+    }
+
+
+    return qg;
 }
 /*
 int main() {

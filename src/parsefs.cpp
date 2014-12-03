@@ -570,12 +570,11 @@ UINT* EdgeFs::IncomingLabelIterator(const UINT vertex_id) {
 
 vector<VERTEX>* EdgeFs::GetOutdegreeVertices(VERTEX src, LABEL l) {
     vector<VERTEX>* acc = new vector<VERTEX>;
-    UINT* it = OutgoingEdgeIterator(src, l);
-    if (it != NULL) {
-        for (int count = 0; count < GetOutDegree(src, l); count += 1) {
-            acc->push_back( *(it) );
-            it += 1;
-        }
+    UINT* out1 = OutgoingEdgeIterator(src, l);
+    UINT* out2 = OutgoingEdgeIteratorEnd(src, l);
+    while (out1 != out2) {
+        acc->push_back( *(out1) );
+        out1++;
     }
     return acc;
 }
