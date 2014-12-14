@@ -33,6 +33,22 @@ struct QueryGraph {
     unordered_map<QueryNode*, UINT>* initialized_query_nodes;
 };
 
+void PrintQueryGraph(QueryGraph* qg) {
+    for (int i =0; i < qg->query_nodes->size(); i += 1) {
+        QueryNode* q = qg->query_nodes->at(i);
+        cout << "VERTEX ID: " << i;
+        cout << " QueryNode: " << q;
+        cout << " Children: ";
+        for (int j = 0; j < q->children->size(); j += 1) 
+            cout << " - " << q->children->at(j);
+        cout << " Parents: ";
+        for (int j = 0; j < q->parents->size(); j += 1) 
+            cout << " - " << q->parents->at(j);
+        cout << endl;
+
+    }
+}
+
 NECNode* NECNodeInit() {
     NECNode* nec_node = new NECNode;
     nec_node->members = new vector<QueryNode*>;
@@ -67,7 +83,7 @@ void PrintQueryGraph(query_node_map* qm) {
     }
 }
 
-QueryGraph* ReadQueryGraphFromFile(const char* file_path) {
+QueryGraph* ReadQueryGraphFromFile(const string& file_path) {
     QueryGraph* qg = new QueryGraph;
     query_node_map* map = new query_node_map;
     unordered_map<QueryNode*, UINT>* initialized = new unordered_map<QueryNode*, UINT>;
@@ -85,17 +101,13 @@ QueryGraph* ReadQueryGraphFromFile(const char* file_path) {
         if (line.length() == 0)
             break;
 
-        SplitString(line, '\t', str_buf);
+        SplitString(line, ',', str_buf);
         vertex = new QueryNode;
         vertex->label = stoul(str_buf[1]);
         vertex->parents = new vector<QueryNode*>;
         vertex->children = new vector<QueryNode*>;
         map->insert(query_node_map::value_type(stoul(str_buf[0]), vertex));
         str_buf.clear();
-#ifdef PRINT_ON
-        cout << "QueryNode Mapping :"<< stoul(str_buf[0]) << "-";
-        cout << vertex << endl;
-#endif
     }
     // Parse adjacency list
     while (getline(file,line)) {
@@ -106,12 +118,11 @@ QueryGraph* ReadQueryGraphFromFile(const char* file_path) {
         if (line.length() == 0)
             break;
 
-        SplitString(line, '\t', str_buf);
+        SplitString(line, ',', str_buf);
+        vertex = map->find(stoul(str_buf[1]))->second;
+        vertex->parents->push_back(map->find(stoul(str_buf[0]))->second);
         vertex = map->find(stoul(str_buf[0]))->second;
-        for(int i = 2; i < str_buf.size(); i += 1) {
-            vertex->children->push_back(map->find(stoul(str_buf[i]))->second);
-            map->find(stoul(str_buf[i]))->second->parents->push_back(vertex);
-        }
+        vertex->children->push_back(map->find(stoul(str_buf[1]))->second);
         str_buf.clear();
     }
     // Parse initialized query vertices.

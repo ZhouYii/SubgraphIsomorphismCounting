@@ -14,9 +14,11 @@
 #define LABEL unsigned int
 #define ULONG unsigned long
 
-#define CHILD 0
-#define PARENT 1
-//#define PRINT_ON
+#define PRINT_ON
+
+// Governs whether subgraph mappings are printed out to file
+//#define PRINT_SUBGRAPH_MATCHED
+//#define SUBGRAPH_OUTPUT_FILE "matched_ouput.txt"
 
 #include <unordered_map>
 #include <unordered_set>
@@ -39,6 +41,8 @@ typedef vector<vector<QueryNode*>*> VectorOfNeighborNodeVectors;
 
 // NECNode->Label->Vector<Candidates>
 typedef unordered_map<NECNode*, unordered_map<VERTEX, vector<VERTEX>*>* > CandidateRegions;
+
+typedef unordered_map<VERTEX, vector<VERTEX>*> SubRegions;
 
 typedef priority_queue<pair<NECNode*, UINT>*, vector<pair<NECNode*, UINT>*>, CompareNEC> NEC_PQ;
 #endif

@@ -112,26 +112,7 @@ UINT VertexFs::NumVertices() {
 UINT VertexFs::NumLabels() {
     return data[1];
 }
-VertexFs::VertexFs(const char* file_path) {
-    FILE *file_stream;
-    ULONG file_len;
 
-    file_stream = fopen(file_path, "rb");
-    fseek(file_stream, 0, SEEK_END);
-    file_len = ftell(file_stream);
-    rewind(file_stream);
-
-    this->data = new UINT[file_len];
-    fread(this->data, sizeof(UINT), file_len, file_stream);
-    fclose(file_stream);
-
-    this->size = 2 + 2*this->data[1] + this->data[0];
-    this->label_names_offset = this->data + 2;
-    this->label_end_offset = this->label_names_offset + this->data[1];
-    this->vertex_offset = this->label_end_offset + this->data[1];
-}
-
-/*
 VertexFs::VertexFs(const char* file_path) {
     ULONG file_len;
     vector<string> str_buf;
@@ -153,27 +134,8 @@ VertexFs::VertexFs(const char* file_path) {
     this->label_end_offset = this->label_names_offset + this->data[1];
     this->vertex_offset = this->label_end_offset + this->data[1];
 }
-*/
-/* Constructor for reading a binary disk image
-VertexFs::VertexFs(const char* file_path) {
-    FILE *file_stream;
-    ULONG file_len;
 
-    file_stream = fopen(file_path, "rb");
-    fseek(file_stream, 0, SEEK_END);
-    file_len = ftell(file_stream);
-    rewind(file_stream);
-
-    this->data = new UINT[file_len];
-    fread(this->data, sizeof(UINT), file_len, file_stream);
-    fclose(file_stream);
-
-    this->size = 2 + 2*this->data[1] + this->data[0];
-    this->label_names_offset = this->data + 2;
-    this->label_end_offset = this->label_names_offset + this->data[1];
-    this->vertex_offset = this->label_end_offset + this->data[1];
-}
-
+/*
 EdgeFs::EdgeFs(const char* file_path, const UINT num_vertices) {
     FILE *file_stream;
     ULONG file_len;
@@ -222,7 +184,6 @@ EdgeFs::EdgeFs(const char* file_path, VertexFs* vfs) {
     this->rev_adjacent_vertex_ids = this->rev_adjacent_vertex_labels + this->reverse_data[num_vertices];
 }
 */
-
 
 EdgeFs::EdgeFs(const char* file_path, const char* rev_file_path, VertexFs* vfs) {
     ULONG file_len;
@@ -349,13 +310,17 @@ UINT* EdgeFs::IncomingEdgeIterator(const UINT vertex_id, const LABEL label) {
 
     while (count > 0) {
         if (label == *(label_it)) {
-            if (vertex_id == 0 && label == 0) 
-                edge_it = adjacent_vertex_ids;
+            if ((vertex_id == 0 && label == 0) ||
+                label_it == rev_adjacent_vertex_labels)
+            {
+                edge_it = rev_adjacent_vertex_ids;
+            }
             else
                 edge_it = rev_adjacent_vertex_ids + *(label_it - 1);
             break;
         }
-        if (vertex_id == 0 && label == 0)
+        if ((vertex_id == 0 && label == 0) ||
+            label_it == rev_adjacent_vertex_labels)
             count -= *(label_it + 1);
         else
             count -= *(label_it + 1) - *(label_it - 1);
@@ -414,29 +379,6 @@ UINT* EdgeFs::OutgoingEdgeIterator(const UINT vertex_id, const LABEL label) {
     }
 }
 
-/*
-UINT* EdgeFs::OutgoingEdgeIterator(const UINT vertex_id, const LABEL label) {
-    int count = GetOutDegree(vertex_id);
-    UINT* label_it = OutgoingLabelIterator(vertex_id);
-    UINT* edge_it = NULL;
-
-    while (count > 0) {
-        if (label == *(label_it)) {
-            if (vertex_id == 0 && label == 0)
-                edge_it  =adjacent_vertex_ids;
-            else 
-                edge_it = adjacent_vertex_ids + *(label_it - 1);
-            break;
-        }
-        if (vertex_id == 0 && label == 0)
-            count -= *(label_it + 1);
-        else
-            count -= *(label_it + 1) - *(label_it - 1);
-    }
-    return edge_it;
-}
-*/
-
 UINT* EdgeFs::OutgoingEdgeIterator(const UINT vertex_id) {
     // 1) Does vertex id start at 0? -> Yes -> +1 is correct because the offsets
     // stored in filesystem are for ending offsets. The start index of vertex i
@@ -461,7 +403,7 @@ UINT* EdgeFs::IncomingEdgeIterator(const UINT vertex_id) {
         // Special case from the rest
         return this->rev_adjacent_vertex_labels;
     }
-    UINT offset = *(this->data + vertex_id);
+    UINT offset = *(this->reverse_data + vertex_id);
     return this->rev_adjacent_vertex_labels + offset;
 }
 
@@ -470,8 +412,9 @@ UINT EdgeFs::GetOutDegree(const UINT vertex_id, const LABEL label) {
     int count = GetOutDegree(vertex_id);
     UINT* label_it = OutgoingLabelIterator(vertex_id);
 
-    while (count > 0) {
-        if (vertex_id == 0 && label == 0) 
+    while (count != 0) {
+        if ((vertex_id == 0 && label == 0) ||
+            label_it == adjacent_vertex_labels) 
             freq = *(label_it + 1);
         else 
             freq = *(label_it + 1) - *(label_it - 1);
@@ -481,8 +424,6 @@ UINT EdgeFs::GetOutDegree(const UINT vertex_id, const LABEL label) {
         }
         count -= freq;
     }
-    if (count < 0)
-        count = 0;
     return count;
 }
 
@@ -492,7 +433,8 @@ UINT EdgeFs::GetInDegree(const UINT vertex_id, const LABEL label) {
     UINT* label_it = IncomingLabelIterator(vertex_id);
 
     while (count > 0) {
-        if (vertex_id == 0 && label == 0)
+        if ((vertex_id == 0 && label == 0) ||
+            label_it == rev_adjacent_vertex_labels)
             freq = *(label_it + 1);
         else 
             freq = *(label_it + 1) - *(label_it - 1);
@@ -509,12 +451,17 @@ UINT EdgeFs::GetInDegree(const UINT vertex_id, const LABEL label) {
 
 UINT EdgeFs::GetOutDegree(const UINT vertex_id) {
     int count = 0;
-    UINT* start = this->OutgoingEdgeIterator(vertex_id);
-    UINT* end = this->OutgoingEdgeIterator(vertex_id + 1);
+    UINT* start = this->OutgoingLabelIterator(vertex_id);
+    UINT* end = this->OutgoingLabelIterator(vertex_id + 1);
+
+    if (end == adjacent_vertex_labels) {
+        return 0;
+    }
 
     count = *(end - 1);
     if (start != adjacent_vertex_labels)
         count -= *(start - 1);
+
     if (count < 0) 
         count = 0;
     return count;
@@ -522,12 +469,17 @@ UINT EdgeFs::GetOutDegree(const UINT vertex_id) {
 
 UINT EdgeFs::GetInDegree(const UINT vertex_id) {
     int count = 0;
-    UINT* start = this->IncomingEdgeIterator(vertex_id);
-    UINT* end = this->IncomingEdgeIterator(vertex_id + 1);
+    UINT* start = this->IncomingLabelIterator(vertex_id);
+    UINT* end = this->IncomingLabelIterator(vertex_id + 1);
+
+    if (end == rev_adjacent_vertex_labels) {
+        return 0;
+    }
 
     count = *(end - 1);
     if (start != rev_adjacent_vertex_labels)
         count -= *(start - 1);
+
     if (count < 0)
         count = 0;
     return count;
@@ -602,53 +554,59 @@ bool EdgeFs::HasEdge(const VERTEX from, const VERTEX to) {
     }
     return false;
 }
-
 /*
+// Diagnostic
+#include <assert.h>
 int main () {
-    VertexFs vfs("dblp_vfs");
-    EdgeFs efs("dblp_efs.txt", "dblp_efs_rev.txt", &vfs);
+    VertexFs vfs("vertex_file");
+    EdgeFs efs("edge_file", "reverse_edge_file", &vfs);
 
-    cout << vfs.NumVertices() << endl;
-    cout << vfs.NumLabels() << endl;
+    cout << "NumVertices" << vfs.NumVertices() << endl;
+    cout << "Num Labels" << vfs.NumLabels() << endl;
 
-    cout << vfs.NumVertices(0) << endl;
-    cout << vfs.NumVertices(1) << endl;
-    cout << vfs.NumVertices(2) << endl;
+    for (int i = 0; i < vfs.NumLabels(); i += 1)
+        cout << "Num Vertices Label " << i << ":" << vfs.NumVertices(i) << endl;
 
     for(int label_idx = 0; label_idx < vfs.NumLabels(); label_idx += 1) {
-        cout << "Label Index :" << label_idx << endl;
+        cout << "Label Index :" << label_idx << " : ";
         UINT* vertex_ptr = vfs.GetVertexIterator(label_idx);
         for(int vertex_idx = 0; vertex_idx < vfs.NumVertices(label_idx); vertex_idx += 1) {
-            cout << vertex_ptr[vertex_idx] << endl;
+            cout << ' ' << vertex_ptr[vertex_idx];
         }
+        cout << endl;
     }
 
-    efs.WriteToFile("dblp_efs2.txt");
-    efs.FlipEdges();
-    efs.WriteToFile("dblp_efs_rev2.txt");
-    for (int vertex = 0; vertex < 12; vertex += 1) {
-        cout << "Vertex:" << vertex;
+    vector<VERTEX>* v;
+    for (int vertex = 0; vertex < vfs.NumVertices(); vertex += 1) {
+        cout << "Vertex:" << vertex << endl;
         cout << " In:" << efs.GetInDegree(vertex) << endl;
         cout << " Out:" << efs.GetOutDegree(vertex) << endl;
 
         for (int label = 0; label < 3; label += 1) {
             cout << "\tLabel" << label << ": " ;
+            cout << "\tIn: " << efs.GetInDegree(vertex, label);
+            cout << "\tOut: " << efs.GetOutDegree(vertex, label);
+            v = efs.GetIndegreeVertices(vertex,label);
+            cout << " In Vertices: ";
+            for (int i = 0; i < v->size(); i += 1)
+                cout << "-" << v->at(i);
+            delete v;
+            v = efs.GetOutdegreeVertices(vertex,label);
+            cout << " Out Vertices: ";
+            for (int i = 0; i < v->size(); i += 1)
+                cout << "-" << v->at(i);
+            delete v;
             UINT* begin = efs.OutgoingEdgeIterator(vertex,label);
             UINT* end = efs.OutgoingEdgeIteratorEnd(vertex,label);
 
+            cout << " Out Vertices: ";
             while (begin != end) {
-                cout << *(begin) << "-";
+                cout <<  *(begin) << "-";
+                //assert(efs.HasEdge(vertex, *(begin)));
                 begin += 1;
             }
             cout << endl;
         }
     }
-    cout << "Outdegree for Vertex 7, Label 1" << endl;
-    cout << "OutDegree" << efs.GetOutDegree(7,1) << endl;
-    vector<VERTEX>* v = efs.GetOutdegreeVertices(7, 1);
-    for(int i = 0; i < v->size(); i += 1) {
-        cout << v->at(i) << " " << endl;
-    }
-}
-*/
+}*/
 #endif

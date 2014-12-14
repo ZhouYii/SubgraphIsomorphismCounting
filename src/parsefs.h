@@ -1,13 +1,24 @@
 #ifndef PARSEFS_H_
 #define PARSEFS_H_
 
-#include "defines.h"
+#define UINT unsigned int
+#define VERTEX unsigned int
+#define LABEL unsigned int
+#define ULONG unsigned long
+
 #include "graph.cpp"
 #include <iostream>
 #include <queue>
 #include <utility>
 #include <stdio.h>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
+#include <queue>
+#include <algorithm>
 using namespace std;
+typedef std::unordered_map<UINT, QueryNode*> query_node_map;
+
 
 class VertexFs 
 {
